@@ -1,0 +1,180 @@
+"""
+Author: Timothy Kornish
+CreatedDate: March - 30 - 2026
+Description: Log into mssql server, query account staging table records.
+             log into salesforce and query existing accounts.
+             merge records from both systems to determine what records exist
+             in both systems, and which records are net new.
+             insert net new records into salesforce account table.
+
+"""
+
+import numpy as np
+import pandas as pd
+import os
+from custom_db_utilities import MSSQL_Utilities, Salesforce_Utilities, Custom_Utilities
+from credentials import Credentials
+
+# create and instance of the custom salesforce utilities class used to interact with Salesforce
+MSSQL_Utils = MSSQL_Utilities()
+# create and instance of the custom salesforce utilities class used to interact with Salesforce
+SF_Utils = Salesforce_Utilities()
+# create and instance of the custom  utilities class
+Utils = Custom_Utilities()
+# create instance of credentials class where creds are stored to load into the script
+Cred = Credentials()
+
+# Set option to display all columns
+pd.set_option('display.max_columns', None)
+
+# declare which environment this script will perform operations against,
+# can have multiple environments in the same script at the same time
+environment = 'localhost'
+database = 'mssql'
+# set the object to perform insert into salesforce against
+object = "Account"
+# limit number of accounts to load due to storage size of SF dev/playground org
+size = 50
+
+# set up directory pathway to load csv data and output fallout and success results to
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
+# success file path
+success_file = dir_path + "\\Output\\INSERT\\SUCCESS_Insert_" + environment + "_" + object + "_" + database + ".csv"
+# fallout file path
+fallout_file = dir_path + "\\Output\\INSERT\\FALLOUT_Insert_" + environment + "_" + object + "_" + database + ".csv"
+
+# initiate an MS SQL cursor to query with
+connection, cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_server(), database = Cred.get_database())
+
+# select accounts to match against the csv to not attempt to insert duplicates
+select_query = f"""SELECT DISTINCT TOP {size} [Acc].[account_number_external_id]
+       [phone]
+      ,[company_name]
+      ,[industry]
+      ,[annual_revenue]
+      ,[Acc].[account_number_external_id]
+      ,[number_of_locations]
+      ,[number_of_employees]
+      ,[sla]
+      ,[sla_serial_number]
+  FROM [Data_Engineering].[dbo].[STG_SOURCE_Accounts] AS Acc
+  INNER JOIN [Data_Engineering].[dbo].[STG_SOURCE_Contracts] AS Con
+  ON [Acc].[account_number_external_id] = [Con].[account_number_external_id]
+  WHERE [end_date] > CAST(GETDATE() AS DATE)"""
+
+# accounts in the mssql table shown in the query above
+stg_account_df = MSSQL_Utils.query_mssql_return_dataframe(select_query, cursor)
+
+# only keep subset of records to load to not surpass 5Mb storage limit of Salesforce Org.
+#stg_account_df = stg_account_df.head(size)
+
+# get credentials for salesforce login
+# declare which environment this script will perform operations against,
+# can have multiple environments in the same script at the same time
+sf_environment = 'Dev'
+# set database to Salesforce
+sf_database = "Salesforce"
+
+# get username from credentials
+sf_username = Cred.get_username(sf_database, sf_environment)
+# get password from credentials
+sf_password = Cred.get_password(sf_database, sf_environment)
+# get login token from credentials
+sf_token = Cred.get_token(sf_database, sf_environment)
+
+# create a instance of simple_salesforce to query and perform operations against salesforce with
+sf = SF_Utils.login_to_salesForce(sf_username, sf_password, sf_token)
+
+# query existing accounts from salesforce
+# query string to select records from salesforce
+account_query = "SELECT Id, Account_Number_External_ID__c FROM Account WHERE Migrated_Record__c = True"
+# query salesforce and return the accounts to be deleted
+account_query_results = SF_Utils.query_salesforce(sf, account_query)
+
+# convert query results to a dataframe
+sf_accounts_df = SF_Utils.load_query_with_lookups_into_dataframe(account_query_results)
+# encode the dataframe before uploading to delete
+sf_accounts_df = Utils.encode_df(sf_accounts_df)
+
+# perform merge of staging accounts and salesforce accounts
+# cannot merge a df with empty df, check if any salesforce migrated records exist
+if len(sf_accounts_df) != 0:
+    # merge the csv data with the salesforce data to match SF Ids to the CSV accounts
+    both_df, sf_accounts_only_df, accounts_to_insert_df = Utils.get_df_diffs(sf_accounts_df, stg_account_df, left_on = ['Account_Number_External_ID__c'], right_on = ['account_number_external_id'], how = 'outer', suffixes = ('_SF', '_STG'), indicator = True)
+    # drop id columns and _merge column
+    accounts_to_insert_df.drop(['Id', 'Account_Number_External_ID__c', '_merge'], axis = 1, inplace = True)
+
+    # remove _merge columns
+    both_df.drop(['_merge'], axis = 1, inplace = True)
+    sf_accounts_only_df.drop(['_merge'], axis = 1, inplace = True)
+
+    # mssql table name the dataframe is being inserted into
+    both_table = "[dbo].[plr_101_Account_In_Both_Systems]"
+
+    # mssql table name the dataframe is being inserted into
+    sf_only_table = "[dbo].[plr_101_sf_accounts_only]"
+
+    # check if fallout dataframe is empty before processing into reporting tables
+    if not (both_df.empty or len(both_df) == 0):
+        # generate datatypes list for each dataframe of accounts in both systems and sf only accounts
+        both_dtypes = Utils.get_dtypes_as_list(both_df)
+        # upload success records to reporting table
+        MSSQL_Utils.upload_reports(connection, cursor, both_table, both_df, both_dtypes, drop_table = True)
+
+
+    if not (sf_accounts_only_df.empty or len(sf_accounts_only_df) == 0):
+        # generate datatypes list for each dataframe of accounts in both systems and sf only accounts
+        sf_only_dtypes = Utils.get_dtypes_as_list(sf_accounts_only_df)
+        # upload fallout records to reporting table
+        MSSQL_Utils.upload_reports(connection, cursor, sf_only_table, sf_accounts_only_df, sf_only_dtypes, drop_table = True)
+else:
+    # if there are no existing accounts in Salesforce, insert all staging accounts
+    accounts_to_insert_df = stg_account_df
+
+# convert float values to ints
+accounts_to_insert_df['number_of_locations'] = accounts_to_insert_df['number_of_locations'].astype('int64')
+accounts_to_insert_df['sla_serial_number'] = accounts_to_insert_df['sla_serial_number'].astype('int64')
+accounts_to_insert_df['number_of_employees'] = accounts_to_insert_df['number_of_employees'].astype('int64')
+accounts_to_insert_df['annual_revenue'] = accounts_to_insert_df['annual_revenue'].astype('int64')
+
+# rename columns to salesforce column names
+accounts_to_insert_df.rename(columns={'phone' : 'Phone',
+                                      'company_name' : 'Name',
+                                      'industry' : 'Industry',
+                                      'annual_revenue' : 'AnnualRevenue',
+                                      'account_number_external_id' : 'Account_Number_External_ID__c',
+                                      'number_of_locations' : 'NumberofLocations__c',
+                                      'number_of_employees' : 'NumberOfEmployees',
+                                      'sla' : 'SLA__c',
+                                      'sla_serial_number' : 'SLASerialNumber__c'}, inplace=True)
+
+# add migrated record tag
+accounts_to_insert_df['Migrated_Record__c'] = True
+
+# insert net new records into salesforce account object
+# upload the records to salesforce
+passing_df, fallout_df = SF_Utils.upload_dataframe_to_salesforce(sf, accounts_to_insert_df, object, 'insert', success_file, fallout_file)
+
+
+
+# mssql table name the dataframe is being inserted into
+success_table_name = "[dbo].[trgt_101_Account_insert_Success]"
+# mssql table name the dataframe is being inserted into
+fallout_table_name = "[dbo].[trgt_101_Account_insert_Fallout]"
+
+# check if passing dataframe is empty before processing into reporting tables
+if not (len(passing_df) == 0):
+    # remove error column on passing df
+    passing_df.drop(['RESULTS_errors'], axis = 1, inplace = True)
+    # generate column types from passing dataframe
+    passing_dtypes = Utils.get_dtypes_as_list(passing_df)
+    # upload success records to reporting table
+    MSSQL_Utils.upload_reports(connection, cursor, success_table_name, passing_df, passing_dtypes, drop_table = True)
+
+# check if fallout dataframe is empty before processing into reporting tables
+if not (len(fallout_df) == 0):
+    # generate column types from fallout dataframe
+    fallout_dtypes = Utils.get_dtypes_as_list(fallout_df)
+    # upload fallout records to reporting table
+    MSSQL_Utils.upload_reports(connection, cursor, fallout_table_name, fallout_df, fallout_dtypes, drop_table = True)
