@@ -16,10 +16,13 @@ import time
 import logging as log
 import coloredlogs
 import json
+import sys
 # pandas and numpy
 import numpy as np
 import pandas as pd
 from pandas.io import sql
+# tenacity for retry salesforce login, since the request times out a lot
+from tenacity import retry, stop_after_attempt, wait_exponential
 # salesforce connector
 from simple_salesforce import Salesforce
 # MSSQL connector
@@ -46,7 +49,7 @@ coloredlogs.install()
 # currently only using info debug level comments
 log.basicConfig(level = log.ERROR)
 # set copy on write on to suppress writing a slice of a dataframe warnings
-pd.set_option("mode.copy_on_write", True)
+#pd.set_option("mode.copy_on_write", True)
 
 class Salesforce_Utilities:
     def __init__(self):
@@ -56,7 +59,8 @@ class Salesforce_Utilities:
            can add login credentials as instance variables to utilize in functions
         """
 
-    def login_to_salesForce(self, username, password, security_token, environment = ""):
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
+    def login_to_salesForce(self, username = "", password = "", security_token = "", environment = "", consumer_key = None, privatekey_file = None, domain = None):
         """
         Description: log into a Salesforce or and return salesforce client
                      to operate with.
@@ -66,27 +70,45 @@ class Salesforce_Utilities:
         Password        - string, salesforce Password
         security_token  - string, salesforce token
         environments    - string, used for logger to state which org being logged into
-
+        instance_url    - string, if none use username and passowrd, else call instance with url
         Return: sf      - Salesforce instance to query against
         """
         # try except block
         try:
             # log status to console
             log.info(f"[Logging into source org: {environment}]")
-            # log into salesforce using simple_salesforce
-            sf = Salesforce(username = username,
-                            password = password,
-                            security_token = security_token
-                            )
-            # log to console the login was successful. if not successful,
-            # there will be a error from Salesforce on the console
-            log.info("[Logged in successfully]")
-            # return instance of salesforce to perform operations with
-            return sf
+            if consumer_key == None:
+                # log into salesforce using simple_salesforce
+                sf = Salesforce(username = username,
+                                password = password,
+                                security_token = security_token
+                                )
+                # log to console the login was successful.
+                log.info("[Logged in successfully]")
+                # if not successful,
+                # there will be a error from Salesforce on the console
+                # return instance of salesforce to perform operations with
+                return sf
+            else:
+                if domain == 'test':
+                    # log into salesforce using simple_salesforce instance_url method
+                    sf = Salesforce(username = username, consumer_key = consumer_key, privatekey_file = privatekey_file, domain = domain)
+                    # log to console the login was successful.
+                    log.info("[Logged in successfully]")
+                    # return instance of salesforce to perform operations with
+                    return sf
+                # log into salesforce using simple_salesforce instance_url method
+                sf = Salesforce(username = username, consumer_key = consumer_key, privatekey_file = privatekey_file)
+                # log to console the login was successful.
+                log.info("[Logged in successfully]")
+                # return instance of salesforce to perform operations with
+                return sf
         # exception block - error logging into salesforce
         except Exception as e:
             # log error when logging into salesforce
             log.exception(f"[Error logging into source org: {environment}...{e}]")
+            # exit script since login failed
+            sys.exit()
 
     def query_salesforce(self, sf, query, include_deleted = False):
         """
@@ -1988,7 +2010,7 @@ class Custom_Utilities:
                 # log to console what sheet is being written
                 log.info(f"[writing sheet to excel file: {str(sheet_names[index])}]")
                 # write the individual dataframe to it's associated sheet
-                df.to_excel(writer, sheet_names[index], index = False)
+                df.to_excel(writer, sheet_name = sheet_names[index], index = False)
             # log finished looping and now writing file out
             log.info("[saving file to output location]")
             # save the file
