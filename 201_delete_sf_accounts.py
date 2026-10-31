@@ -26,7 +26,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # declare which environment this script will perform operations against,
 # can have multiple environments in the same script at the same time
-sf_environment = 'Dev'
+sf_environment = 'Dev_RCA'
 # set database to Salesforce
 sf_database = "Salesforce"
 #set object for output files
@@ -37,16 +37,20 @@ success_file = dir_path + "\\Output\\DELETE\\SUCCESS_Delete_" + sf_environment +
 # fallout file path
 fallout_file = dir_path + "\\Output\\DELETE\\FALLOUT_Delete_" + sf_environment + "_" + object + "_" + sf_database + ".csv"
 
-# get credentials for salesforce login
+sf_environment = 'Dev_RCA'
+# set database to Salesforce
+sf_database = "Salesforce"
+
 # get username from credentials
 sf_username = Cred.get_username(sf_database, sf_environment)
-# get password from credentials
-sf_password = Cred.get_password(sf_database, sf_environment)
-# get login token from credentials
-sf_token = Cred.get_token(sf_database, sf_environment)
+# get consumer_key from credentials
+sf_consumer_key = Cred.get_consumer_key(sf_database, sf_environment)
+# get privatekey_file from credentials
+sf_privatekey_file = Cred.get_privatekey_file(sf_database, sf_environment)
 
 # create a instance of simple_salesforce to query and perform operations against salesforce with
-sf = SF_Utils.login_to_salesForce(sf_username, sf_password, sf_token)
+sf = SF_Utils.login_to_salesForce(username = sf_username, consumer_key = sf_consumer_key, privatekey_file = sf_privatekey_file)
+
 # query string to select records from salesforce
 account_query = "SELECT Id FROM Account WHERE Migrated_Record__c = True"
 # query salesforce and return the accounts to be deleted
