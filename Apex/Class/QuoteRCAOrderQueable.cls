@@ -24,6 +24,7 @@ public class RCAOrderQueueable implements Queueable {
                 for (Invocable.Action.Result result : results) {
                     if (!result.isSuccess()) {
                         List<Invocable.Action.Error> errors = result.getErrors();
+                        for (Invocable.Action.Error err : errors) {
                             System.debug('RCA Order Generation Failed: ' + err.getMessage());
                         }
                     } else {
