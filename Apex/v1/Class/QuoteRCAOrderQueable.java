@@ -1,8 +1,8 @@
-public class RCAOrderQueueable implements Queueable {
+public class QuoteRCAOrderQueueable implements Queueable {
     private Set<Id> quoteIds;
 
     // Constructor to pass IDs from the trigger context
-    public RCAOrderQueueable(Set<Id> quoteIds) {
+    public QuoteRCAOrderQueueable(Set<Id> quoteIds) {
         this.quoteIds = quoteIds;
     }
 

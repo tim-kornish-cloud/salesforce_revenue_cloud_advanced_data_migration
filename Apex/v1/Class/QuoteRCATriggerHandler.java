@@ -7,10 +7,10 @@ public with sharing class QuoteRCATriggerHandler {
             Quote oldQuote = oldQuoteMap.get(newQuote.Id);
 
             // Replace 'Your_Custom_Field__c' with your actual custom field API name
-            Boolean fieldWasPopulated = newQuote.Your_Custom_Field__c != null && oldQuote.Your_Custom_Field__c == null;
+            Boolean fieldWasPopulated = newQuote.Order_Migrated_Quote__c == true && oldQuote.Order_Migrated_Quote__c == false;
 
             // Ensures the quote is in an appropriate status to be converted into an order
-            Boolean isValidStatus = newQuote.Status == 'Approved';
+            Boolean isValidStatus = (newQuote.Status == 'Approved' || newQuote.Status == 'Accepted');
 
             if (fieldWasPopulated && isValidStatus) {
                 quotesToOrderIds.add(newQuote.Id);
@@ -19,7 +19,7 @@ public with sharing class QuoteRCATriggerHandler {
 
         // Enqueue the native asynchronous runner if matching quotes exist
         if (!quotesToOrderIds.isEmpty()) {
-            System.enqueueJob(new RCAOrderQueueable(quotesToOrderIds));
+            System.enqueueJob(new QuoteRCAOrderQueueable(quotesToOrderIds));
         }
     }
 }
