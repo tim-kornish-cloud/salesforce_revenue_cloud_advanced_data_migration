@@ -13,7 +13,7 @@ public class QuoteRCAOrderQueueable implements Queueable {
                 Invocable.Action action = Invocable.Action.createStandardAction('createOrdersFromQuote');
 
                 // Set required parameters for standard order generation
-                action.setInvocationParameter('quoteId', quoteId);
+                action.setInvocationParameter('quoteId', String.valueOf(quoteId));
 
                 // Options: 'CreateSingleOrder', 'CreateOrderByGroup', or 'CreateOrderByField'
                 action.setInvocationParameter('orderCreationMethod', 'CreateSingleOrder');
