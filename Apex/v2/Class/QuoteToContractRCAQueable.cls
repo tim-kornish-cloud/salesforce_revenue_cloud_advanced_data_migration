@@ -10,25 +10,20 @@ public class QuoteToContractRCAQueable implements Queueable {
         for (Id quoteId : this.quoteIds) {
             try {
                 // Instantiates the native standard RCA action engine
-                Invocable.Action action = Invocable.Action.createStandardAction('createOrdersFromQuote');
+                Invocable.Action action = Invocable.Action.createStandardAction('createContractFromQuote');
 
-                // Set required parameters for standard order generation
-                action.setInvocationParameter('quoteId', String.valueOf(quoteId));
+                // Set the required parameter constraints for contract generation
+                action.setInvocationParameter('sourceId', String.valueOf(quoteId));
 
-                // Options: 'CreateSingleOrder', 'CreateOrderByGroup', or 'CreateOrderByField'
-                action.setInvocationParameter('orderCreationMethod', 'CreateSingleOrder');
-
-                // Invoke the execution framework
+                // Invoke the standard action
                 List<Invocable.Action.Result> results = action.invoke();
 
+                // Error handling log validation
                 for (Invocable.Action.Result result : results) {
                     if (!result.isSuccess()) {
-                        List<Invocable.Action.Error> errors = result.getErrors();
-                        for (Invocable.Action.Error err : errors) {
-                            System.debug('RCA Order Generation Failed: ' + err.getMessage());
+                        for (Invocable.Action.Error error : result.getErrors()) {
+                            System.debug('Error creating Contract: ' + error.getMessage());
                         }
-                    } else {
-                        System.debug('RCA Order successfully created for Quote ID: ' + quoteId);
                     }
                 }
             } catch (Exception e) {

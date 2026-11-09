@@ -1,4 +1,4 @@
-public with sharing class QuoteToOrderRCATriggerHandler {
+public without sharing class QuoteToOrderRCATriggerHandler {
 
     public static void handleAfterUpdate(List<Quote> newQuotes, Map<Id, Quote> oldQuoteMap) {
         Set<Id> quotesToOrderIds = new Set<Id>();
@@ -6,7 +6,7 @@ public with sharing class QuoteToOrderRCATriggerHandler {
         for (Quote newQuote : newQuotes) {
             Quote oldQuote = oldQuoteMap.get(newQuote.Id);
 
-            // Replace 'Your_Custom_Field__c' with your actual custom field API name
+            // verify the checkbox to generate a new order is set to true
             Boolean fieldWasPopulated = newQuote.Order_Migrated_Quote__c == true && oldQuote.Order_Migrated_Quote__c == false;
 
             // Ensures the quote is in an appropriate status to be converted into an order
