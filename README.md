@@ -44,19 +44,20 @@ Apply the structural variations, selling mechanisms, and rules to the finalized 
 
 ## Quick Summary Table
 
-Phase	      Object Name	                    Primary Dependency / Foreign Key
-1	          ProrationPolicy	                None
-1	          ProductSellingModel	            None
-1	          ProductFulfillmentScenario	    None
-2	          AttributePicklist	              None
-2	          AttributePicklistValue	        AttributePicklist
-2	          AttributeDefinition	            AttributePicklist
-2	          AttributeCategory	              None
-2	          AttributeCategoryAttribute	    AttributeCategory, AttributeDefinition
-3	          ProductClassification	          None
-3	          ProductClassificationAttr	      ProductClassification, AttributeDefinition
-4	          ProductCatalog	                None
-4	          ProductCategory	                ProductCatalog
-4	          Product2	                      ProductClassification
-5	          ProductSellingModelOption	      Product2, ProductSellingModel, ProrationPolicy
-5	          ProductAttributeDefinition	    Product2, AttributeDefinition, AttributeCategory
+| Phase | Object Name | Primary Dependency / Foreign Key |
+| ----- | ----------- | -------------------------------- |
+| 1	| ProrationPolicy	| None |
+| 1	| ProductSellingModel	| None |
+| 1	| ProductFulfillmentScenario | None |
+| 2	| AttributePicklist	|     None
+| 2	| AttributePicklistValue | AttributePicklist |
+| 2	| AttributeDefinition	| AttributePicklist|
+| 2	| AttributeCategory	| None |
+| 2	| AttributeCategoryAttribute |AttributeCategory, AttributeDefinition |
+| 3	| ProductClassification	| None |
+| 3	| ProductClassificationAttr	| ProductClassification, AttributeDefinition |
+| 4	| ProductCatalog | None|
+| 4	| ProductCategory	| ProductCatalog |
+| 4	| Product2 | ProductClassification |
+| 5	| ProductSellingModelOption	| Product2, ProductSellingModel, ProrationPolicy |
+| 5	| ProductAttributeDefinition |Product2, AttributeDefinition, AttributeCategory |
