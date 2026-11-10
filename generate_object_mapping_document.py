@@ -53,7 +53,7 @@ Cred = Credentials()
 
 # declare which environment this script will perform operations against,
 # can have multiple environments in the same script at the same time
-environment = 'Dev'
+environment = 'Dev_RCA'
 
 # set database to Salesforce
 database = "Salesforce"
@@ -90,7 +90,9 @@ target_column_rename_dict = {'name' : 'Target Field API name',
                              'calculated' : 'Target Field is Calculated'}
 
 # set object to grab metadata for and will also be used as sheet names
-objects = ["Account", "Contact", "Opportunity", "SBQQ__Quote__c",  "SBQQ__QuoteLine__c", "Order", "OrderItem", "Contract", "SBQQ__Subscription__c"]
+objects = ["Account", "Contact", "Opportunity", "Quote",  "QuoteLineItem", "Order", "OrderItem", "Contract", "Asset", "Product2"
+           "AttributePicklist", "AttributePicklistValue", "AttributeDefinition", "AttributeCategory", "ProductClassification",
+           "ProductClassificationAttr", "ProductAttributeDefinition", "ProductFulfillmentScenario"]
 
 # set up list of dataframes to be converted to excel sheets
 dfs = []
@@ -102,7 +104,7 @@ for object in objects:
     dfs = dfs + [mapping_df]
 
 # mapping document file name
-file_name = "Mapping_Document.xlsx"
+file_name = "RCA_Mapping_Document.xlsx"
 # name of each sheet in mapping document that coordinates to each dataframe in dfs
 sheet_names = objects
 # output dataframes in excel file
