@@ -53,23 +53,23 @@ Cred = Credentials()
 
 # declare which environment this script will perform operations against,
 # can have multiple environments in the same script at the same time
-environment = 'Dev_RCA'
+sf_environment = 'Dev_RCA'
 
 # set database to Salesforce
-database = "Salesforce"
+sf_database = "Salesforce"
 
 # set up directory pathway to load csv data and output fallout and success results to
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # get username from credentials
-username = Cred.get_username(database, environment)
-# get password from credentials
-password = Cred.get_password(database, environment)
-# get login token from credentials
-token = Cred.get_token(database, environment)
+sf_username = Cred.get_username(sf_database, sf_environment)
+# get consumer_key from credentials
+sf_consumer_key = Cred.get_consumer_key(sf_database, sf_environment)
+# get privatekey_file from credentials
+sf_privatekey_file = Cred.get_privatekey_file(sf_database, sf_environment)
 
 # create a instance of simple_salesforce to query and perform operations against salesforce with
-sf = SF_Utils.login_to_salesForce(username, password, token)
+sf = SF_Utils.login_to_salesForce(username = sf_username, consumer_key = sf_consumer_key, privatekey_file = sf_privatekey_file)
 
 # set list of field metadata to keep
 fields_metadata_to_keep = ['name', 'label', 'type', 'length', 'precision', 'unique', 'nillable', 'picklistValues', 'custom', 'calculated']
