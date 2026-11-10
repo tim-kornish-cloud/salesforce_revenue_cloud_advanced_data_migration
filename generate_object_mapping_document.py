@@ -90,7 +90,7 @@ target_column_rename_dict = {'name' : 'Target Field API name',
                              'calculated' : 'Target Field is Calculated'}
 
 # set object to grab metadata for and will also be used as sheet names
-objects = ["Account", "Contact", "Opportunity", "Quote",  "QuoteLineItem", "Order", "OrderItem", "Contract", "Asset", "Product2"
+objects = ["Account", "Contact", "Opportunity", "Quote",  "QuoteLineItem", "Order", "OrderItem", "Contract", "Asset", "Product2", 
            "AttributePicklist", "AttributePicklistValue", "AttributeDefinition", "AttributeCategory", "ProductClassification",
            "ProductClassificationAttr", "ProductAttributeDefinition", "ProductFulfillmentScenario"]
 
