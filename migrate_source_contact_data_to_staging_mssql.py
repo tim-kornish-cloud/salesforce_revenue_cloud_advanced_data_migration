@@ -1,66 +1,135 @@
 """
 Author: Timothy Kornish
-CreatedDate: August - 25 - 2025
-Description: log into a MySQL Database.
-             query contact records.
-             log into MSSQL staging database and insert records into contacts staging table
+CreatedDate: November - 10 - 2025
+Description: log into a Salesforce source org.
+             query contact records with all fields.
+             log into MSSQL staging database and
+             insert records into contacts staging table
 """
 
 import numpy as np
 import pandas as pd
 import os
-from custom_db_utilities import MSSQL_Utilities, MySQL_Utilities, Custom_Utilities
+from custom_db_utilities import MSSQL_Utilities, Salesforce_Utilities, Custom_Utilities
 from credentials import Credentials
 
 # create and instance of the custom salesforce utilities class used to interact with Salesforce
-MySQL_Utils = MySQL_Utilities()
-# create and instance of the custom salesforce utilities class used to interact with Salesforce
 MSSQL_Utils = MSSQL_Utilities()
-# create instance of credentials class where creds are stored to load into the script
-Cred = Credentials()
+# create and instance of the custom salesforce utilities class used to interact with Salesforce
+SF_Utils = Salesforce_Utilities()
 # create and instance of the custom  utilities class
 Utils = Custom_Utilities()
+# create instance of credentials class where creds are stored to load into the script
+Cred = Credentials()
 
-# declare which environment this script will perform operations against,
-# can have multiple environments in the same script at the same time
-env = 'localhost'
+# set environment to get credentials for salesforce login
+sf_environment = 'Dev'
+# set database to Salesforce
+sf_database = "Salesforce"
 
-# set database to MySQL
-database = "MySQL"
+# set mssql server to insert staging tables into
+mssql_environment = "localhost"
+# set mssql dbms parameter
+mssql_dbms = "MSSQL"
 
-# set up directory pathway to load csv data and output fallout and success results to
-dir_path = os.path.dirname(os.path.realpath(__file__))
+# get username from credentials
+sf_username = Cred.get_username(sf_database, sf_environment)
+# get consumer_key from credentials
+sf_consumer_key = Cred.get_consumer_key(sf_database, sf_environment)
+# get privatekey_file from credentials
+sf_privatekey_file = Cred.get_privatekey_file(sf_database, sf_environment)
 
-# retrieve credentials to connect to mysql table
-server = Cred.get_server(dbms = database, env = env)
-database = Cred.get_database(dbms = database, env = env)
-username = Cred.get_mysql_username(dbms = database, env = env)
-password = Cred.get_mysql_password(dbms = database, env = env)
+# create a instance of simple_salesforce to query and perform operations against salesforce with
+sf = SF_Utils.login_to_salesForce(username = sf_username, consumer_key = sf_consumer_key, privatekey_file = sf_privatekey_file)
 
-# initiate a MySQL engine to query with
-mysql_connection, mysql_cursor = MySQL_Utils.login_to_mysql(server = server, database = database,
-                                         username = username, password = password)
+# query existing contacts from salesforce
+# query string to select records from salesforce
+contact_query = """SELECT
+	Id,
+	Name,
+	AccountId,
+	AssistantName,
+	AssistantPhone,
+	Birthdate,
+	CleanStatus,
+	CreatedById,
+	CreatedDate,
+	Department,
+	Description,
+	Email,
+	EmailBouncedDate,
+	EmailBouncedReason,
+	Fax,
+	FirstName,
+	HomePhone,
+	IndividualId,
+	IsDeleted,
+	IsEmailBounced,
+	IsPriorityRecord,
+	Jigsaw,
+	JigsawContactId,
+	Languages__c,
+	LastActivityDate,
+	LastCURequestDate,
+	LastCUUpdateDate,
+	LastModifiedById,
+	LastModifiedDate,
+	LastName,
+	LastReferencedDate,
+	LastViewedDate,
+	LeadSource,
+	Level__c,
+	MailingAddress,
+	MailingCity,
+	MailingCountry,
+	MailingGeocodeAccuracy,
+	MailingLatitude,
+	MailingLongitude,
+	MailingPostalCode,
+	MailingState,
+	MailingStreet,
+	MasterRecordId,
+	Migrated_Record__c,
+	MobilePhone,
+	OtherAddress,
+	OtherCity,
+	OtherCountry,
+	OtherGeocodeAccuracy,
+	OtherLatitude,
+	OtherLongitude,
+	OtherPhone,
+	OtherPostalCode,
+	OtherState,
+	OtherStreet,
+	OwnerId,
+	Phone,
+	PhotoUrl,
+	ReportsToId,
+	Salutation,
+	SystemModstamp,
+	Title
+FROM Contact"""
 
-# set query to query all the records that are on the table
-accounts_query = "SELECT * FROM data_engineering.contacts"
+# query salesforce and return the contacts to be deleted
+contact_query_results = SF_Utils.query_salesforce(sf, contact_query)
+# convert query results to a dataframe
+sf_contacts_df = SF_Utils.load_query_with_lookups_into_dataframe(contact_query_results)
 
-# query the records inserted
-account_df = MySQL_Utils.query_mysql_return_dataframe(accounts_query, mysql_connection)
+# since shipping address and billing address infor is comprised of multiple fields
+# that are returned with a .
+# this throws an error when inserting to mssql,
+# change to underscore for continuity
+sf_contacts_df.columns = sf_contacts_df.columns.str.replace('.', '_', regex=False)
 
-# fill na with blank string
-account_df = account_df.fillna('')
 
 # initiate an MS SQL connection and cursor to query with
-mssql_connection, mssql_cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_server(), database = Cred.get_database())
-
-# list of data types to convert the df columns to fit MSSQL
-# need to find a way to parse the df.columns and generate this automatically
-# this is a temporaray bandaid being hardcoded, honestly may perform a subset of
-# hardcoding these types instead of the entire dataframe
-column_types = ('str', 'str', 'str', 'str', 'str', 'str', 'str')
+mssql_connection, mssql_cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_server(dbms = mssql_dbms, env = mssql_environment),
+                                                            database = Cred.get_database(dbms = mssql_dbms, env = mssql_environment))
 
 # mssql table name the dataframe is being inserted into
-table_name = 'STG_SOURCE_Contacts'
+table_name = 'SF_CPQ_STG_Contacts'
 
+# generate column types from passing dataframe
+sf_contacts_dtypes = Utils.get_dtypes_as_list(sf_contacts_df)
 # insert subset of the csv  from a dataframe into the mssql table
-MSSQL_Utils.insert_dataframe_into_mssql_table(mssql_connection, mssql_cursor, account_df, table_name, column_types)
+MSSQL_Utils.upload_reports(mssql_connection, mssql_cursor, table_name, sf_contacts_df, sf_contacts_dtypes, drop_table = True)
