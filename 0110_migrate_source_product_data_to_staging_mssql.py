@@ -28,7 +28,7 @@ sf_environment = 'Dev'
 sf_database = "Salesforce"
 
 # set mssql server to insert staging tables into
-mssql_environment = "localhost"
+mssql_environment = "RCA_Migration"
 # set mssql dbms parameter
 mssql_dbms = "MSSQL"
 
@@ -158,4 +158,4 @@ table_name = 'SF_CPQ_STG_Product2'
 # generate column types from passing dataframe
 sf_products_dtypes = Utils.get_dtypes_as_list(sf_products_df)
 # insert sf records dataframe into the mssql table
-MSSQL_Utils.upload_reports(mssql_connection, mssql_cursor, table_name, sf_products_df, sf_products_dtypes, drop_table = True)
+MSSQL_Utils.upload_reports(mssql_connection, mssql_cursor, table_name, sf_products_df, sf_products_dtypes, drop_table = True, db_name = mssql_environment)

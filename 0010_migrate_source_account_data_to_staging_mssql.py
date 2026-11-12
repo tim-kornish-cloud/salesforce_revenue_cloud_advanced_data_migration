@@ -28,7 +28,7 @@ sf_environment = 'Dev'
 sf_database = "Salesforce"
 
 # set mssql server to insert staging tables into
-mssql_environment = "localhost"
+mssql_environment = "RCA_Migration"
 # set mssql dbms parameter
 mssql_dbms = "MSSQL"
 
@@ -136,7 +136,6 @@ sf_accounts_df = SF_Utils.load_query_with_lookups_into_dataframe(account_query_r
 # change to underscore for continuity
 sf_accounts_df.columns = sf_accounts_df.columns.str.replace('.', '_', regex=False)
 
-
 # initiate an MS SQL connection and cursor to query with
 mssql_connection, mssql_cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_server(dbms = mssql_dbms, env = mssql_environment),
                                                             database = Cred.get_database(dbms = mssql_dbms, env = mssql_environment))
@@ -146,5 +145,5 @@ table_name = 'SF_CPQ_STG_Accounts'
 
 # generate column types from passing dataframe
 sf_accounts_dtypes = Utils.get_dtypes_as_list(sf_accounts_df)
-# insert subset of the csv  from a dataframe into the mssql table
-MSSQL_Utils.upload_reports(mssql_connection, mssql_cursor, table_name, sf_accounts_df, sf_accounts_dtypes, drop_table = True)
+# insert sf records dataframe into the mssql table
+MSSQL_Utils.upload_reports(mssql_connection, mssql_cursor, table_name, sf_accounts_df, sf_accounts_dtypes, drop_table = True, db_name = mssql_environment)
