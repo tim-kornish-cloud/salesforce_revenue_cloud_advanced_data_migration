@@ -32,13 +32,15 @@ Now that your financial structures and attribute rules are ready, build the cata
 11. ProductCatalog – High-level corporate catalog definition.
 12. ProductCategory – Category and subcategory tiers within the active ProductCatalog.
 13. Product2 – The actual product record. Note: It looks up to ProductClassification and underlying pricing parameters.
+14. ProductCategoryProduct - The junction object mapping ProductCategory to product2.
+15. ProductComponentGroup - Used for configuring product bundles
 
 ## Phase 5: Product Relationships & Constraints
 
 Apply the structural variations, selling mechanisms, and rules to the finalized Product2 records.
 
-14. ProductSellingModelOption – Connects Product2 to its valid ProductSellingModel options and references the ProrationPolicy.
-15. ProductAttributeDefinition – Maps localized attribute definitions directly onto specific Product2 records.
+16. ProductSellingModelOption – Connects Product2 to its valid ProductSellingModel options and references the ProrationPolicy.
+17. ProductAttributeDefinition – Maps localized attribute definitions directly onto specific Product2 records.
 
 
 
@@ -59,5 +61,7 @@ Apply the structural variations, selling mechanisms, and rules to the finalized 
 | 4	| ProductCatalog | None|
 | 4	| ProductCategory	| ProductCatalog |
 | 4	| Product2 | ProductClassification |
+| 4	| ProductCategoryProduct | ProductCategory, Product2 |
+| 4	| ProductComponentGroup | Product2 |
 | 5	| ProductSellingModelOption	| Product2, ProductSellingModel, ProrationPolicy |
 | 5	| ProductAttributeDefinition |Product2, AttributeDefinition, AttributeCategory |
