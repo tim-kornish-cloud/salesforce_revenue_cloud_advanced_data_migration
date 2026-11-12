@@ -1,0 +1,133 @@
+"""
+Author: Timothy Kornish
+CreatedDate: November - 11 - 2025
+Description: log into a Salesforce source org.
+             query order_item records with all fields.
+             log into MSSQL staging database and
+             insert records into order_items staging table
+"""
+
+import numpy as np
+import pandas as pd
+import os
+from custom_db_utilities import MSSQL_Utilities, Salesforce_Utilities, Custom_Utilities
+from credentials import Credentials
+
+# create and instance of the custom salesforce utilities class used to interact with Salesforce
+MSSQL_Utils = MSSQL_Utilities()
+# create and instance of the custom salesforce utilities class used to interact with Salesforce
+SF_Utils = Salesforce_Utilities()
+# create and instance of the custom  utilities class
+Utils = Custom_Utilities()
+# create instance of credentials class where creds are stored to load into the script
+Cred = Credentials()
+
+# set environment to get credentials for salesforce login
+sf_environment = 'Dev'
+# set database to Salesforce
+sf_database = "Salesforce"
+
+# set mssql server to insert staging tables into
+mssql_environment = "localhost"
+# set mssql dbms parameter
+mssql_dbms = "MSSQL"
+
+# get username from credentials
+sf_username = Cred.get_username(sf_database, sf_environment)
+# get consumer_key from credentials
+sf_consumer_key = Cred.get_consumer_key(sf_database, sf_environment)
+# get privatekey_file from credentials
+sf_privatekey_file = Cred.get_privatekey_file(sf_database, sf_environment)
+
+# create a instance of simple_salesforce to query and perform operations against salesforce with
+sf = SF_Utils.login_to_salesForce(username = sf_username, consumer_key = sf_consumer_key, privatekey_file = sf_privatekey_file)
+
+# query existing order_items from salesforce
+# query string to select records from salesforce
+order_item_query = """SELECT
+	Id,
+	AvailableQuantity,
+	CreatedById,
+	CreatedDate,
+	Description,
+	EndDate,
+	IsDeleted,
+	LastModifiedById,
+	LastModifiedDate,
+	ListPrice,
+	OrderId,
+	OrderItemNumber,
+	OriginalOrderItemId,
+	PricebookEntryId,
+	Product2Id,
+	Quantity,
+	SBQQ__Activated__c,
+	SBQQ__Asset__c,
+	SBQQ__BillingFrequency__c,
+	SBQQ__BillingType__c,
+	SBQQ__BlockPrice__c,
+	SBQQ__BookingsIndicator__c,
+	SBQQ__BundleRoot__c,
+	SBQQ__ChargeType__c,
+	SBQQ__Contract__c,
+	SBQQ__ContractAction__c,
+	SBQQ__Contracted__c,
+	SBQQ__ContractingMethod__c,
+	SBQQ__DefaultSubscriptionTerm__c,
+	SBQQ__DimensionType__c,
+	SBQQ__DiscountSchedule__c,
+	SBQQ__OrderedQuantity__c,
+	SBQQ__OrderProductBookings__c,
+	SBQQ__PriceDimension__c,
+	SBQQ__PriceSchedule__c,
+	SBQQ__PricingMethod__c,
+	SBQQ__ProductSubscriptionType__c,
+	SBQQ__ProrateMultiplier__c,
+	SBQQ__QuotedListPrice__c,
+	SBQQ__QuotedQuantity__c,
+	SBQQ__QuoteLine__c,
+	SBQQ__RequiredBy__c,
+	SBQQ__RevisedOrderProduct__c,
+	SBQQ__SegmentIndex__c,
+	SBQQ__SegmentKey__c,
+	SBQQ__ShippingAccount__c,
+	SBQQ__Status__c,
+	SBQQ__Subscription__c,
+	SBQQ__SubscriptionPricing__c,
+	SBQQ__SubscriptionTerm__c,
+	SBQQ__SubscriptionType__c,
+	SBQQ__TaxAmount__c,
+	SBQQ__TaxCode__c,
+	SBQQ__TermDiscountSchedule__c,
+	SBQQ__TerminatedDate__c,
+	SBQQ__UnproratedNetPrice__c,
+	SBQQ__UpgradedSubscription__c,
+	ServiceDate,
+	SystemModstamp,
+	TotalPrice,
+	UnitPrice
+FROM OrderItem"""
+
+# query salesforce and return the order_items to be deleted
+order_item_query_results = SF_Utils.query_salesforce(sf, order_item_query)
+# convert query results to a dataframe
+sf_order_items_df = SF_Utils.load_query_with_lookups_into_dataframe(order_item_query_results)
+
+# since shipping address and billing address infor is comprised of multiple fields
+# that are returned with a .
+# this throws an error when inserting to mssql,
+# change to underscore for continuity
+sf_order_items_df.columns = sf_order_items_df.columns.str.replace('.', '_', regex=False)
+
+
+# initiate an MS SQL connection and cursor to query with
+mssql_connection, mssql_cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_server(dbms = mssql_dbms, env = mssql_environment),
+                                                            database = Cred.get_database(dbms = mssql_dbms, env = mssql_environment))
+
+# mssql table name the dataframe is being inserted into
+table_name = 'SF_CPQ_STG_OrderItem'
+
+# generate column types from passing dataframe
+sf_order_items_dtypes = Utils.get_dtypes_as_list(sf_order_items_df)
+# insert subset of the csv  from a dataframe into the mssql table
+MSSQL_Utils.upload_reports(mssql_connection, mssql_cursor, table_name, sf_order_items_df, sf_order_items_dtypes, drop_table = True)
