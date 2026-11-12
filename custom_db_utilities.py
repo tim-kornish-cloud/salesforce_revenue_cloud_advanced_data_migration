@@ -746,7 +746,7 @@ class MSSQL_Utilities:
             # log error when attempting to execute query
             log.exception(f"[Error checking if table exists, check table spelling...{e}]")
 
-    def upload_reports(self, connection, cursor, table_name, df, column_types, drop_table = False, varchar_size = 250):
+    def upload_reports(self, connection, cursor, table_name, df, column_types, db_name, drop_table = False, varchar_size = 250):
         """Description: create reporting table if non exists then upload results dataframe to report tables
            Parameters:
 
@@ -755,6 +755,7 @@ class MSSQL_Utilities:
            table_name               - string, table to check if already exists in DB
            df                       - dataframe to updload to table
            column_types             - list of string, holds metadata types for table columns to create in MSSQL
+           db_name                  - database name to upload table reports to
            drop_table               - Boolean, drop table before repopulating,
            varchar_size             - int, default value for varchar fields
 
@@ -778,7 +779,7 @@ class MSSQL_Utilities:
             df[cols_to_fill] = df[cols_to_fill].fillna("")
 
             # create SQL string to create new table
-            sql_string = self.generate_sql_create_table_string_from_df(df, table_name, drop_table, varchar_size) # drop_table doesn't make sense here since only can apply if table does not exist, but then can't drop what does not exist.
+            sql_string = self.generate_sql_create_table_string_from_df(df, table_name, drop_table, varchar_size, db_name) # drop_table doesn't make sense here since only can apply if table does not exist, but then can't drop what does not exist.
 
             # execute SQL to generate new reporting table
             self.execute_sql(connection, cursor, sql_string)
@@ -790,7 +791,7 @@ class MSSQL_Utilities:
             # log error when returning a datetime string of now
             log.exception(f"[Error uploading dataframe to table...{e}]")
 
-    def generate_sql_create_table_string_from_df(self, df, table_name, drop_table = False, varchar_size = 250, auto_gen = False):
+    def generate_sql_create_table_string_from_df(self, df, table_name, drop_table = False, varchar_size = 250, auto_gen = False, db_name = "Data_Engineering"):
         """
         Description: Analyze a pandas dataframe and generate an SQL statement
                      to create a table with all required columns with correctly
@@ -799,8 +800,9 @@ class MSSQL_Utilities:
         df              - dataframe to generate a Create Table call from
         table_name      - String, name of new table to create, should include the database name, default -> [db_name].[dbo].[table_name]
         drop_table      - Boolean, drop table if exists, default = False
-        auto_gen        - Boolean, default = False, use built in pandas SQL get_schema function, mainly for testing
         varchar_size    - set default value for varchar fields, default = 250, for higher precision creat new parameter that accepts dict with field info. or Print out string and manually edit
+        auto_gen        - Boolean, default = False, use built in pandas SQL get_schema function, mainly for testing
+        db_name         - String, default database name to "Data_Engineering"
 
         Return:        - SQL Create Table String
         """
@@ -811,7 +813,7 @@ class MSSQL_Utilities:
             if auto_gen:
                 create_table_sql = sql.get_schema(df, name = table_name)
             else:
-                create_table_sql = f"USE [Data_Engineering] SET ANSI_NULLS ON SET QUOTED_IDENTIFIER ON "
+                create_table_sql = f"USE [{db_name}] SET ANSI_NULLS ON SET QUOTED_IDENTIFIER ON "
                 if drop_table:
                     create_table_sql = create_table_sql + f"DROP TABLE IF EXISTS {table_name} "
                 create_table_sql = create_table_sql + f"CREATE TABLE {table_name} (\n"
