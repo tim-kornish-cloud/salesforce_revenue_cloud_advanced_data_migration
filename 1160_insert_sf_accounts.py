@@ -8,12 +8,13 @@ Description: Log into mssql server, query account staging table records.
              insert net new records into salesforce account table.
 
 """
-
+import sys
 import numpy as np
 import pandas as pd
 import os
 from custom_db_utilities import MSSQL_Utilities, Salesforce_Utilities, Custom_Utilities
 from credentials import Credentials
+import duckdb
 
 # create and instance of the custom salesforce utilities class used to interact with Salesforce
 MSSQL_Utils = MSSQL_Utilities()
@@ -51,24 +52,64 @@ fallout_file = dir_path + "\\Output\\INSERT\\FALLOUT_Insert_" + environment + "_
 # initiate an MS SQL cursor to query with
 connection, cursor = MSSQL_Utils.login_to_mssql(server = mssql_server, database = mssql_db)
 
-# select accounts to match against the csv to not attempt to insert duplicates
-select_query = f"""SELECT DISTINCT TOP {size} [Acc].[account_number_external_id]
-       [phone]
-      ,[company_name]
-      ,[industry]
-      ,[annual_revenue]
-      ,[Acc].[account_number_external_id]
-      ,[number_of_locations]
-      ,[number_of_employees]
-      ,[sla]
-      ,[sla_serial_number]
-  FROM [Data_Engineering].[dbo].[STG_SOURCE_Accounts] AS Acc
-  INNER JOIN [Data_Engineering].[dbo].[STG_SOURCE_Contracts] AS Con
-  ON [Acc].[account_number_external_id] = [Con].[account_number_external_id]
-  WHERE [end_date] > CAST(GETDATE() AS DATE)"""
+# select accounts to match with active contracts
+# select_query = f"""SELECT TOP 50
+#        [Phone]
+#       ,[Name]
+#       ,[Industry]
+#       ,[AnnualRevenue]
+#       ,[Account_Number_External_ID__c]
+#       ,[NumberofLocations__c]
+#       ,[NumberOfEmployees]
+#       ,[SLA__c]
+#       ,[SLASerialNumber__c]
+#   FROM [RCA_Migration].[dbo].[SF_CPQ_STG_Accounts] AS Acc
+#   INNER JOIN [RCA_Migration].[dbo].[SF_CPQ_STG_Contract] AS Con
+#   ON [Acc].[Id] LIKE [Con].[AccountId]
+#   WHERE CAST(CAST([EndDate] AS VARCHAR(50)) AS DATE) > CAST(GETDATE() AS DATE)"""
+
+stg_accounts_query = """SELECT [Id]
+,[Phone]
+,[Name]
+,[Industry]
+,[AnnualRevenue]
+,[Account_Number_External_ID__c]
+,[NumberofLocations__c]
+,[NumberOfEmployees]
+,[SLA__c]
+,[SLASerialNumber__c]
+FROM [RCA_Migration].[dbo].[SF_CPQ_STG_Accounts]"""
+
+stg_contracts_query = """SELECT [AccountId]
+,[EndDate]
+FROM [RCA_Migration].[dbo].[SF_CPQ_STG_Contract]"""
 
 # accounts in the mssql table shown in the query above
-stg_account_df = MSSQL_Utils.query_mssql_return_dataframe(select_query, cursor)
+stg_account_df = MSSQL_Utils.query_mssql_return_dataframe(stg_accounts_query, cursor)
+
+# contracts in the mssql table shown in the query above
+stg_contracts_df = MSSQL_Utils.query_mssql_return_dataframe(stg_contracts_query, cursor)
+
+
+summary_df = duckdb.sql("""
+    SELECT
+            Phone
+           ,Name
+           ,Industry
+           ,AnnualRevenue
+           ,Account_Number_External_ID__c
+           ,NumberofLocations__c
+           ,NumberOfEmployees
+           ,SLA__c
+           ,SLASerialNumber__c
+       FROM stg_account_df
+       INNER JOIN stg_contracts_df
+       ON stg_account_df.Id = stg_contracts_df.AccountId
+       WHERE cast(stg_contracts_df.EndDate AS DATE) > today()""").df()
+
+print(summary_df.head())
+
+sys.exit()
 
 # only keep subset of records to load to not surpass 5Mb storage limit of Salesforce Org.
 #stg_account_df = stg_account_df.head(size)
@@ -106,6 +147,12 @@ if len(sf_accounts_df) != 0:
     # drop id columns and _merge column
     accounts_to_insert_df.drop(['Id', 'Account_Number_External_ID__c', '_merge'], axis = 1, inplace = True)
 
+
+    print(accounts_to_insert_df.head())
+    # stop script here
+    sys.exit()
+
+
     # remove _merge columns
     both_df.drop(['_merge'], axis = 1, inplace = True)
     sf_accounts_only_df.drop(['_merge'], axis = 1, inplace = True)
@@ -138,17 +185,6 @@ accounts_to_insert_df['number_of_locations'] = accounts_to_insert_df['number_of_
 accounts_to_insert_df['sla_serial_number'] = accounts_to_insert_df['sla_serial_number'].astype('int64')
 accounts_to_insert_df['number_of_employees'] = accounts_to_insert_df['number_of_employees'].astype('int64')
 accounts_to_insert_df['annual_revenue'] = accounts_to_insert_df['annual_revenue'].astype('int64')
-
-# rename columns to salesforce column names
-accounts_to_insert_df.rename(columns={'phone' : 'Phone',
-                                      'company_name' : 'Name',
-                                      'industry' : 'Industry',
-                                      'annual_revenue' : 'AnnualRevenue',
-                                      'account_number_external_id' : 'Account_Number_External_ID__c',
-                                      'number_of_locations' : 'NumberofLocations__c',
-                                      'number_of_employees' : 'NumberOfEmployees',
-                                      'sla' : 'SLA__c',
-                                      'sla_serial_number' : 'SLASerialNumber__c'}, inplace=True)
 
 # add migrated record tag
 accounts_to_insert_df['Migrated_Record__c'] = True
