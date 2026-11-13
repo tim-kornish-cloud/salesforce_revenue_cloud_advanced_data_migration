@@ -131,7 +131,8 @@ subscription_query = """SELECT
 	SBQQ__TerminatedDate__c,
 	SBQQ__UnitCost__c,
 	SystemModstamp
-FROM SBQQ__Subscription__c"""
+FROM SBQQ__Subscription__c
+WHERE SBQQ__QuoteLine__r.Migrated_Record__c = true"""
 
 # query salesforce and return the subscriptions to be deleted
 subscription_query_results = SF_Utils.query_salesforce(sf, subscription_query)
@@ -151,7 +152,15 @@ mssql_connection, mssql_cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_se
 # mssql table name the dataframe is being inserted into
 table_name = 'SF_CPQ_STG_SBQQ__Subscription__c'
 
+# drop table if already exists;
+drop_table_sql =  f"""USE [{mssql_environment}] SET ANSI_NULLS ON SET QUOTED_IDENTIFIER ON;
+                    DROP TABLE IF EXISTS {table_name}; """
+
+# execute sql
+MSSQL_Utils.execute_sql(mssql_connection, mssql_cursor, drop_table_sql)
+
 # generate column types from passing dataframe
 sf_subscriptions_dtypes = Utils.get_dtypes_as_list(sf_subscriptions_df)
+
 # insert sf records dataframe into the mssql table
 MSSQL_Utils.upload_reports(mssql_connection, mssql_cursor, table_name, sf_subscriptions_df, sf_subscriptions_dtypes, drop_table = True, db_name = mssql_environment)
