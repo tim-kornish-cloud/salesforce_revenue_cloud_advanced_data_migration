@@ -136,12 +136,22 @@ sf_accounts_df = SF_Utils.load_query_with_lookups_into_dataframe(account_query_r
 # change to underscore for continuity
 sf_accounts_df.columns = sf_accounts_df.columns.str.replace('.', '_', regex=False)
 
+# convert column of float to stirng
+sf_accounts_df['AnnualRevenue'] = sf_accounts_df['AnnualRevenue'].astype(str)
+
 # initiate an MS SQL connection and cursor to query with
 mssql_connection, mssql_cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_server(dbms = mssql_dbms, env = mssql_environment),
                                                             database = Cred.get_database(dbms = mssql_dbms, env = mssql_environment))
 
 # mssql table name the dataframe is being inserted into
 table_name = 'SF_CPQ_STG_Accounts'
+
+# drop table if already exists;
+drop_table_sql =  f"""USE [{mssql_environment}] SET ANSI_NULLS ON SET QUOTED_IDENTIFIER ON;
+                    DROP TABLE IF EXISTS {table_name}; """
+
+# execute sql
+MSSQL_Utils.execute_sql(mssql_connection, mssql_cursor, drop_table_sql)
 
 # generate column types from passing dataframe
 sf_accounts_dtypes = Utils.get_dtypes_as_list(sf_accounts_df)
