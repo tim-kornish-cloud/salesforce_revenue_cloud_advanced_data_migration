@@ -113,7 +113,8 @@ contract_query = """SELECT
 	Status,
 	StatusCode,
 	SystemModstamp
-FROM Contract"""
+FROM Contract
+WHERE SBQQ__Quote__r.Migrated_Record__c = true"""
 
 # query salesforce and return the contracts to be deleted
 contract_query_results = SF_Utils.query_salesforce(sf, contract_query)
@@ -132,6 +133,13 @@ mssql_connection, mssql_cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_se
 
 # mssql table name the dataframe is being inserted into
 table_name = 'SF_CPQ_STG_Contract'
+
+# drop table if already exists;
+drop_table_sql =  f"""USE [{mssql_environment}] SET ANSI_NULLS ON SET QUOTED_IDENTIFIER ON;
+                    DROP TABLE IF EXISTS {table_name}; """
+
+# execute sql
+MSSQL_Utils.execute_sql(mssql_connection, mssql_cursor, drop_table_sql)
 
 # generate column types from passing dataframe
 sf_contracts_dtypes = Utils.get_dtypes_as_list(sf_contracts_df)

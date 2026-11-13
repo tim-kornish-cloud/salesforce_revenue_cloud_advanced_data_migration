@@ -123,7 +123,8 @@ account_query = """SELECT
 	UpsellOpportunity__c,
 	Website,
 	YearStarted
-FROM Account"""
+FROM Account
+WHERE Migrated_Record__c = true"""
 
 # query salesforce and return the accounts to be deleted
 account_query_results = SF_Utils.query_salesforce(sf, account_query)
