@@ -29,12 +29,16 @@ pd.set_option('display.max_columns', None)
 
 # declare which environment this script will perform operations against,
 # can have multiple environments in the same script at the same time
-environment = 'localhost'
-database = 'mssql'
+environment = 'RCA_Migration'
+database = 'MSSQL'
 # set the object to perform insert into salesforce against
 object = "Account"
 # limit number of accounts to load due to storage size of SF dev/playground org
 size = 50
+
+# retrieve values for mssql db and server
+mssql_db  = Cred.get_database(dbms = database, env = environment)
+mssql_server = Cred.get_server(dbms = database, env = environment)
 
 # set up directory pathway to load csv data and output fallout and success results to
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -45,7 +49,7 @@ success_file = dir_path + "\\Output\\INSERT\\SUCCESS_Insert_" + environment + "_
 fallout_file = dir_path + "\\Output\\INSERT\\FALLOUT_Insert_" + environment + "_" + object + "_" + database + ".csv"
 
 # initiate an MS SQL cursor to query with
-connection, cursor = MSSQL_Utils.login_to_mssql(server = Cred.get_server(), database = Cred.get_database())
+connection, cursor = MSSQL_Utils.login_to_mssql(server = mssql_server, database = mssql_db)
 
 # select accounts to match against the csv to not attempt to insert duplicates
 select_query = f"""SELECT DISTINCT TOP {size} [Acc].[account_number_external_id]
@@ -91,11 +95,8 @@ sf = SF_Utils.login_to_salesForce(username = sf_username, consumer_key = sf_cons
 account_query = "SELECT Id, Account_Number_External_ID__c FROM Account WHERE Migrated_Record__c = True"
 # query salesforce and return the accounts to be deleted
 account_query_results = SF_Utils.query_salesforce(sf, account_query)
-
 # convert query results to a dataframe
 sf_accounts_df = SF_Utils.load_query_with_lookups_into_dataframe(account_query_results)
-# encode the dataframe before uploading to delete
-sf_accounts_df = Utils.encode_df(sf_accounts_df)
 
 # perform merge of staging accounts and salesforce accounts
 # cannot merge a df with empty df, check if any salesforce migrated records exist
@@ -120,14 +121,14 @@ if len(sf_accounts_df) != 0:
         # generate datatypes list for each dataframe of accounts in both systems and sf only accounts
         both_dtypes = Utils.get_dtypes_as_list(both_df)
         # upload success records to reporting table
-        MSSQL_Utils.upload_reports(connection, cursor, both_table, both_df, both_dtypes, drop_table = True)
+        MSSQL_Utils.upload_reports(connection, cursor, both_table, both_df, both_dtypes, drop_table = True, db_name = mssql_db)
 
 
     if not (sf_accounts_only_df.empty or len(sf_accounts_only_df) == 0):
         # generate datatypes list for each dataframe of accounts in both systems and sf only accounts
         sf_only_dtypes = Utils.get_dtypes_as_list(sf_accounts_only_df)
         # upload fallout records to reporting table
-        MSSQL_Utils.upload_reports(connection, cursor, sf_only_table, sf_accounts_only_df, sf_only_dtypes, drop_table = True)
+        MSSQL_Utils.upload_reports(connection, cursor, sf_only_table, sf_accounts_only_df, sf_only_dtypes, drop_table = True, db_name = mssql_db)
 else:
     # if there are no existing accounts in Salesforce, insert all staging accounts
     accounts_to_insert_df = stg_account_df
@@ -170,11 +171,11 @@ if not (len(passing_df) == 0):
     # generate column types from passing dataframe
     passing_dtypes = Utils.get_dtypes_as_list(passing_df)
     # upload success records to reporting table
-    MSSQL_Utils.upload_reports(connection, cursor, success_table_name, passing_df, passing_dtypes, drop_table = True)
+    MSSQL_Utils.upload_reports(connection, cursor, success_table_name, passing_df, passing_dtypes, drop_table = True, db_name = mssql_db)
 
 # check if fallout dataframe is empty before processing into reporting tables
 if not (len(fallout_df) == 0):
     # generate column types from fallout dataframe
     fallout_dtypes = Utils.get_dtypes_as_list(fallout_df)
     # upload fallout records to reporting table
-    MSSQL_Utils.upload_reports(connection, cursor, fallout_table_name, fallout_df, fallout_dtypes, drop_table = True)
+    MSSQL_Utils.upload_reports(connection, cursor, fallout_table_name, fallout_df, fallout_dtypes, drop_table = True, db_name = mssql_db)
