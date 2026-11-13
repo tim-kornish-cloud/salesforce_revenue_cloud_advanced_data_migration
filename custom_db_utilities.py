@@ -813,9 +813,9 @@ class MSSQL_Utilities:
             if auto_gen:
                 create_table_sql = sql.get_schema(df, name = table_name)
             else:
-                create_table_sql = f"USE [{db_name}] SET ANSI_NULLS ON SET QUOTED_IDENTIFIER ON "
+                create_table_sql = f"USE [{db_name}] SET ANSI_NULLS ON SET QUOTED_IDENTIFIER ON; "
                 if drop_table:
-                    create_table_sql = create_table_sql + f"DROP TABLE IF EXISTS {table_name} "
+                    create_table_sql = create_table_sql + f"DROP TABLE IF EXISTS {table_name}; "
                 create_table_sql = create_table_sql + f"CREATE TABLE {table_name} (\n"
                 # loop through each column in the dataframe to format
                 for index, col in enumerate(df.columns):
@@ -834,7 +834,7 @@ class MSSQL_Utilities:
                             create_table_sql = create_table_sql + f"[{col}] [NVARCHAR]({varchar_size}) NULL,\n"
                         # check if type == float
                         elif df[col].dtypes == "float64":
-                            create_table_sql = create_table_sql + f"[{col}] DECIMAL(16,2) NULL,\n"
+                            create_table_sql = create_table_sql + f"[{col}] [NVARCHAR](25) NULL,\n"
                         # check if type == boolean
                         elif df[col].dtypes == "bool":
                             create_table_sql = create_table_sql + f"[{col}] [NVARCHAR](5) NULL,\n"
